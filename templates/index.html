@@ -1,0 +1,18 @@
+{% extends 'base.html' %}
+{% block title %}Discover campus life{% endblock %}
+{% block content %}
+<section class="hero">
+  <div class="hero-orb orb-one"></div><div class="hero-orb orb-two"></div>
+  <div class="hero-copy"><div class="eyebrow"><span class="live-dot"></span> YOUR CAMPUS, IN FULL COLOUR</div>
+    <h1>Make your<br>campus years <em>count.</em></h1>
+    <p class="hero-sub">Discover the ideas, people and experiences that make college unforgettable. Your next big moment starts here.</p>
+    <div class="hero-actions"><a class="btn btn-lime" href="{{ url_for('events') }}">Explore events <span>↗</span></a><a class="text-link" href="{{ url_for('event_calendar') }}">View calendar <span>→</span></a></div>
+    <div class="hero-proof"><div class="avatar-stack"><span>🎨</span><span>💻</span><span>🎤</span><span>⚽</span></div><div><strong>{{ total_events }}+ experiences</strong><small>made for curious minds</small></div></div>
+  </div>
+  <div class="hero-visual"><div class="visual-card visual-main"><div class="visual-top"><span>UP NEXT · STUDENT LIFE</span><span class="pill-dark">OPEN TO ALL</span></div><div class="big-emoji">💡</div><h3>Ideas become<br><span>something real.</span></h3><div class="visual-bottom"><span>CREATE · CONNECT · CELEBRATE</span><span>✳</span></div></div><div class="float-card float-date"><span class="float-icon">📅</span><div><strong>One calendar</strong><small>Every campus moment</small></div></div><div class="float-card float-join"><span class="float-icon">✦</span><div><strong>Find your people</strong><small>Start with one event</small></div></div><div class="sparkle">✳</div></div>
+</section>
+<section class="stats-strip"><div><strong>{{ total_events }}</strong><span>Live events</span></div><div><strong>{{ total_reg }}</strong><span>Student sign-ups</span></div><div><strong>∞</strong><span>Ways to get involved</span></div><div class="strip-note">A campus full of possibilities. <span>→</span></div></section>
+<section class="section-block"><div class="section-heading"><div><div class="eyebrow">THE GOOD STUFF</div><h2>Find your <em>next thing.</em></h2></div><a class="text-link" href="{{ url_for('events') }}">All events <span>→</span></a></div>
+<div class="event-grid">{% for event in events %}<article class="event-card"><div class="event-art art-{{ loop.index }}"><span class="art-emoji">{{ event.image_emoji }}</span><span class="art-category">{{ event.category }}</span><span class="art-date">{{ event.event_date[8:10] }}<small>{{ event.event_date[5:7] }}</small></span></div><div class="event-body"><div class="event-meta">◷ {{ event.event_time }} <span>·</span> {{ event.venue }}</div><h3>{{ event.title }}</h3><p>{{ event.description }}</p><div class="event-card-bottom"><span>{{ event.registered }}/{{ event.capacity }} joined</span><a href="{{ url_for('event_detail', event_id=event.id) }}">Details <span>↗</span></a></div></div></article>{% else %}<p>No published events yet.</p>{% endfor %}</div></section>
+<section class="cta-band"><div><div class="eyebrow">GOT AN IDEA?</div><h2>Great campus moments<br>start with <em>someone like you.</em></h2></div><a class="btn btn-dark" href="{{ url_for('admin_login') }}">Organise an event ↗</a><div class="cta-doodle">✳</div></section>
+{% endblock %}
