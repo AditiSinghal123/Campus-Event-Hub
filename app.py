@@ -1,5 +1,5 @@
 import os, sqlite3, calendar
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from functools import wraps
 from flask import Flask, render_template, request, redirect, url_for, session, flash, g
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -27,45 +27,120 @@ def close_db(exc):
 def init_db():
     db = sqlite3.connect(DB_PATH)
     db.execute("PRAGMA foreign_keys = ON")
+
     db.executescript("""
     CREATE TABLE IF NOT EXISTS admins (
-      id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE NOT NULL,
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      username TEXT UNIQUE NOT NULL,
       password_hash TEXT NOT NULL
     );
+
     CREATE TABLE IF NOT EXISTS events (
-      id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL,
-      category TEXT NOT NULL, description TEXT NOT NULL, venue TEXT NOT NULL,
-      event_date TEXT NOT NULL, event_time TEXT NOT NULL, capacity INTEGER NOT NULL DEFAULT 100,
-      image_emoji TEXT NOT NULL DEFAULT '🎉', status TEXT NOT NULL DEFAULT 'Published',
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      title TEXT NOT NULL,
+      category TEXT NOT NULL,
+      description TEXT NOT NULL,
+      venue TEXT NOT NULL,
+      event_date TEXT NOT NULL,
+      event_time TEXT NOT NULL,
+      capacity INTEGER NOT NULL DEFAULT 100,
+      image_emoji TEXT NOT NULL DEFAULT '🎉',
+      status TEXT NOT NULL DEFAULT 'Published',
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
+
     CREATE TABLE IF NOT EXISTS registrations (
-      id INTEGER PRIMARY KEY AUTOINCREMENT, event_id INTEGER NOT NULL,
-      student_name TEXT NOT NULL, email TEXT NOT NULL, student_id TEXT NOT NULL,
-      department TEXT NOT NULL, phone TEXT NOT NULL, registered_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      event_id INTEGER NOT NULL,
+      student_name TEXT NOT NULL,
+      email TEXT NOT NULL,
+      student_id TEXT NOT NULL,
+      department TEXT NOT NULL,
+      phone TEXT NOT NULL,
+      registered_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       status TEXT NOT NULL DEFAULT 'Pending',
       FOREIGN KEY(event_id) REFERENCES events(id) ON DELETE CASCADE,
       UNIQUE(event_id, email)
     );
     """)
-    count = db.execute("SELECT COUNT(*) FROM admins").fetchone()[0]
+
+    # Add new date/time columns without deleting existing data
+    columns = {
+        row[1]
+        for row in db.execute("PRAGMA table_info(events)").fetchall()
+    }
+
+    for column in (
+        "event_start_date",
+        "event_end_date",
+        "event_start_time",
+        "event_end_time",
+    ):
+        if column not in columns:
+            db.execute(
+                f"ALTER TABLE events ADD COLUMN {column} TEXT"
+            )
+
+    # Preserve existing events using their original dates and times
+    db.execute("""
+        UPDATE events
+        SET event_start_date =
+                COALESCE(NULLIF(event_start_date, ''), event_date),
+            event_end_date =
+                COALESCE(NULLIF(event_end_date, ''), event_date),
+            event_start_time =
+                COALESCE(NULLIF(event_start_time, ''), event_time),
+            event_end_time =
+                COALESCE(NULLIF(event_end_time, ''), event_time)
+    """)
+
+    count = db.execute(
+        "SELECT COUNT(*) FROM admins"
+    ).fetchone()[0]
+
     if not count:
-        db.execute("INSERT INTO admins(username,password_hash) VALUES(?,?)",
-                   ("admin", generate_password_hash("Campus@123")))
-    count = db.execute("SELECT COUNT(*) FROM events").fetchone()[0]
+        db.execute(
+            "INSERT INTO admins(username, password_hash) VALUES(?, ?)",
+            ("admin", generate_password_hash("Campus@123"))
+        )
+
+    count = db.execute(
+        "SELECT COUNT(*) FROM events"
+    ).fetchone()[0]
+
     if not count:
         samples = [
-          ("InnovateX Hackathon", "Technology", "A high-energy 12-hour build sprint for bold ideas, prototypes and teamwork.", "Innovation Lab, Block B", "2026-11-12", "09:30", 120, "💻", "Published"),
-          ("Rhythm & Roots", "Cultural", "An evening of music, dance and performances celebrating campus creativity.", "Open Air Theatre", "2026-11-18", "17:00", 250, "🎭", "Published"),
-          ("Future Leaders Summit", "Seminar", "Meet inspiring speakers and explore leadership, careers and emerging industries.", "Auditorium", "2026-11-25", "10:00", 180, "🎤", "Published"),
-          ("Campus Cup", "Sports", "Bring your team spirit to our inter-department sports showdown.", "Sports Ground", "2026-12-03", "08:00", 200, "🏆", "Published"),
-          ("Design for Good", "Workshop", "A hands-on design-thinking workshop focused on meaningful student-led solutions.", "Design Studio, Block A", "2026-12-09", "11:00", 60, "🎨", "Published"),
-          ("Green Campus Day", "Community", "Join a campus clean-up, tree planting and sustainability challenge.", "Central Lawn", "2026-12-15", "09:00", 100, "🌱", "Published"),
+            ("InnovateX Hackathon", "Technology",
+             "A high-energy 12-hour build sprint for bold ideas, prototypes and teamwork.",
+             "Innovation Lab, Block B", "2026-11-12", "09:30", 120, "💻", "Published"),
+            ("Rhythm & Roots", "Cultural",
+             "An evening of music, dance and performances celebrating campus creativity.",
+             "Open Air Theatre", "2026-11-18", "17:00", 250, "🎭", "Published"),
+            ("Future Leaders Summit", "Seminar",
+             "Meet inspiring speakers and explore leadership, careers and emerging industries.",
+             "Auditorium", "2026-11-25", "10:00", 180, "🎤", "Published"),
+            ("Campus Cup", "Sports",
+             "Bring your team spirit to our inter-department sports showdown.",
+             "Sports Ground", "2026-12-03", "08:00", 200, "🏆", "Published"),
+            ("Design for Good", "Workshop",
+             "A hands-on design-thinking workshop focused on meaningful student-led solutions.",
+             "Design Studio, Block A", "2026-12-09", "11:00", 60, "🎨", "Published"),
+            ("Green Campus Day", "Community",
+             "Join a campus clean-up, tree planting and sustainability challenge.",
+             "Central Lawn", "2026-12-15", "09:00", 100, "🌱", "Published"),
         ]
-        db.executemany("""INSERT INTO events(title,category,description,venue,event_date,event_time,capacity,image_emoji,status)
-                          VALUES(?,?,?,?,?,?,?,?,?)""", samples)
+
+        db.executemany("""
+            INSERT INTO events(
+                title, category, description, venue, event_date,
+                event_time, capacity, image_emoji, status
+            )
+            VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, samples)
+
     db.commit()
     db.close()
+
 
 def admin_required(fn):
     @wraps(fn)
@@ -150,25 +225,79 @@ def apply(event_id):
 @app.route("/calendar")
 def event_calendar():
     today = date.today()
+
     try:
         year = int(request.args.get("year", today.year))
         month = int(request.args.get("month", today.month))
-        if month < 1 or month > 12 or year < 2020 or year > 2100: raise ValueError()
+
+        if month < 1 or month > 12 or year < 2020 or year > 2100:
+            raise ValueError()
     except ValueError:
         year, month = today.year, today.month
+
     cal = calendar.Calendar(firstweekday=0)
     db = get_db()
-    event_rows = db.execute("SELECT id,title,event_date,event_time,category,image_emoji FROM events WHERE status='Published' AND substr(event_date,1,4)=? AND substr(event_date,6,2)=?",
-                            (str(year), f"{month:02d}")).fetchall()
+
+    month_start = date(year, month, 1)
+    month_end = date(
+        year + (month == 12),
+        1 if month == 12 else month + 1,
+        1
+    ) - timedelta(days=1)
+
+    event_rows = db.execute("""
+        SELECT
+            id,
+            title,
+            category,
+            image_emoji,
+            COALESCE(NULLIF(event_start_date, ''), event_date) AS start_date,
+            COALESCE(NULLIF(event_end_date, ''), event_date) AS end_date,
+            COALESCE(NULLIF(event_start_time, ''), event_time) AS start_time,
+            COALESCE(NULLIF(event_end_time, ''), event_time) AS end_time
+        FROM events
+        WHERE status = 'Published'
+          AND COALESCE(NULLIF(event_start_date, ''), event_date) <= ?
+          AND COALESCE(NULLIF(event_end_date, ''), event_date) >= ?
+    """, (month_end.isoformat(), month_start.isoformat())).fetchall()
+
     by_date = {}
-    for ev in event_rows: by_date.setdefault(ev["event_date"], []).append(dict(ev))
-    prev_month = 12 if month == 1 else month-1
-    prev_year = year-1 if month == 1 else year
-    next_month = 1 if month == 12 else month+1
-    next_year = year+1 if month == 12 else year
+
+    for ev in event_rows:
+        event = dict(ev)
+
+        start = date.fromisoformat(event["start_date"])
+        end = date.fromisoformat(event["end_date"])
+
+        current = max(start, month_start)
+        last_day = min(end, month_end)
+
+        while current <= last_day:
+            day_key = current.isoformat()
+            by_date.setdefault(day_key, []).append(event)
+            current += timedelta(days=1)
+
+    prev_month = 12 if month == 1 else month - 1
+    prev_year = year - 1 if month == 1 else year
+
+    next_month = 1 if month == 12 else month + 1
+    next_year = year + 1 if month == 12 else year
+
     weeks = cal.monthdayscalendar(year, month)
-    return render_template("calendar.html", year=year, month=month, month_name=calendar.month_name[month],
-        weeks=weeks, by_date=by_date, prev_month=prev_month, prev_year=prev_year, next_month=next_month, next_year=next_year, today=today.isoformat())
+
+    return render_template(
+        "calendar.html",
+        year=year,
+        month=month,
+        month_name=calendar.month_name[month],
+        weeks=weeks,
+        by_date=by_date,
+        prev_month=prev_month,
+        prev_year=prev_year,
+        next_month=next_month,
+        next_year=next_year,
+        today=today.isoformat()
+    )
 
 @app.route("/admin/login", methods=["GET","POST"])
 def admin_login():
@@ -208,31 +337,89 @@ def admin_dashboard():
     category_counts = db.execute("SELECT category,COUNT(*) AS count FROM events GROUP BY category ORDER BY count DESC").fetchall()
     return render_template("admin_dashboard.html", stats=stats, upcoming=upcoming, recent=recent, category_counts=category_counts)
 
-@app.route("/admin/events", methods=["GET","POST"])
+
+@app.route("/admin/events", methods=["GET", "POST"])
 @admin_required
 def admin_events():
     db = get_db()
+
     if request.method == "POST":
-        title = request.form.get("title","").strip()
-        category = request.form.get("category","").strip()
-        description = request.form.get("description","").strip()
-        venue = request.form.get("venue","").strip()
-        event_date = request.form.get("event_date","").strip()
-        event_time = request.form.get("event_time","").strip()
-        try: capacity = max(1, int(request.form.get("capacity","100")))
-        except ValueError: capacity = 100
-        emoji = request.form.get("image_emoji","🎉").strip()[:8] or "🎉"
-        if not all([title,category,description,venue,event_date,event_time]):
-            flash("Fill in all required event details.", "danger")
+        title = request.form.get("title", "").strip()
+        category = request.form.get("category", "").strip()
+        description = request.form.get("description", "").strip()
+        venue = request.form.get("venue", "").strip()
+
+        start_date = request.form.get("event_start_date", "").strip()
+        end_date = request.form.get("event_end_date", "").strip()
+        start_time = request.form.get("event_start_time", "").strip()
+        end_time = request.form.get("event_end_time", "").strip()
+
+        try:
+            capacity = max(1, int(request.form.get("capacity", "100")))
+        except ValueError:
+            capacity = 100
+
+        emoji = request.form.get("image_emoji", "🎉").strip()[:8] or "🎉"
+
+        if not all([
+            title, category, description, venue,
+            start_date, end_date, start_time, end_time
+        ]):
+            flash("Please fill in all required event details.", "danger")
         else:
-            db.execute("""INSERT INTO events(title,category,description,venue,event_date,event_time,capacity,image_emoji)
-                          VALUES(?,?,?,?,?,?,?,?)""", (title,category,description,venue,event_date,event_time,capacity,emoji))
-            db.commit()
-            flash("Event created successfully.", "success")
-            return redirect(url_for("admin_events"))
-    rows = db.execute("""SELECT e.*, (SELECT COUNT(*) FROM registrations r WHERE r.event_id=e.id) AS registered
-                         FROM events e ORDER BY event_date DESC""").fetchall()
+            try:
+                start_day = date.fromisoformat(start_date)
+                end_day = date.fromisoformat(end_date)
+
+                datetime.strptime(start_time, "%H:%M")
+                datetime.strptime(end_time, "%H:%M")
+
+                if end_day < start_day:
+                    raise ValueError("End date must not precede start date.")
+
+                if end_day == start_day and end_time < start_time:
+                    raise ValueError("End time must not precede start time.")
+
+            except ValueError:
+                flash(
+                    "Enter valid dates and times. The end must not be before the start.",
+                    "danger"
+                )
+            else:
+                db.execute("""
+                    INSERT INTO events (
+                        title, category, description, venue,
+                        event_date, event_time,
+                        capacity, image_emoji,
+                        event_start_date, event_end_date,
+                        event_start_time, event_end_time
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    title, category, description, venue,
+                    start_date, start_time,
+                    capacity, emoji,
+                    start_date, end_date,
+                    start_time, end_time
+                ))
+
+                db.commit()
+                flash("Event created successfully.", "success")
+                return redirect(url_for("admin_events"))
+
+    rows = db.execute("""
+        SELECT e.*,
+               (SELECT COUNT(*)
+                FROM registrations r
+                WHERE r.event_id = e.id) AS registered
+        FROM events e
+        ORDER BY COALESCE(
+            NULLIF(event_start_date, ''), event_date
+        ) DESC
+    """).fetchall()
+
     return render_template("admin_events.html", events=rows)
+
 
 @app.route("/admin/events/<int:event_id>/delete", methods=["POST"])
 @admin_required

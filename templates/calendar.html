@@ -1,2 +1,72 @@
-{% extends 'base.html' %}{% block title %}Event calendar{% endblock %}
-{% block content %}<section class="page-intro calendar-intro"><div class="eyebrow">PLAN YOUR MONTH</div><h1>Good things are<br><em>on the calendar.</em></h1><p>Make room for the moments you'll remember.</p></section><section class="calendar-panel"><div class="calendar-head"><div><div class="eyebrow">CAMPUS PLANNER</div><h2>{{ month_name }} <span>{{ year }}</span></h2></div><div class="calendar-nav"><a href="{{ url_for('event_calendar',year=prev_year,month=prev_month) }}">←</a><a href="{{ url_for('event_calendar') }}">Today</a><a href="{{ url_for('event_calendar',year=next_year,month=next_month) }}">→</a></div></div><div class="calendar-grid">{% for day in ['MON','TUE','WED','THU','FRI','SAT','SUN'] %}<div class="calendar-weekday">{{ day }}</div>{% endfor %}{% for week in weeks %}{% for day in week %}{% if day %}{% set daystr = '%04d-%02d-%02d'|format(year,month,day) %}<div class="calendar-day {{ 'is-today' if daystr==today else '' }} {{ 'has-events' if by_date.get(daystr) else '' }}"><span class="day-number">{{ day }}</span>{% for ev in by_date.get(daystr,[]) %}<a class="calendar-event" title="{{ ev.title }}" href="{{ url_for('event_detail',event_id=ev.id) }}"><span>{{ ev.image_emoji }}</span><b>{{ ev.title }}</b><small>{{ ev.event_time }}</small></a>{% endfor %}</div>{% else %}<div class="calendar-day empty-day"></div>{% endif %}{% endfor %}{% endfor %}</div><div class="calendar-legend"><span><i></i> Published events</span><span>Click an event to view details</span></div></section>{% endblock %}
+
+{% extends 'base.html' %}
+{% block title %}Event calendar{% endblock %}
+
+{% block content %}
+<section class="page-intro calendar-intro">
+  <div class="eyebrow">PLAN YOUR MONTH</div>
+  <h1>Good things are<br><em>on the calendar.</em></h1>
+  <p>Make room for the moments you'll remember.</p>
+</section>
+
+<section class="calendar-panel">
+  <div class="calendar-head">
+    <div>
+      <div class="eyebrow">CAMPUS PLANNER</div>
+      <h2>{{ month_name }} <span>{{ year }}</span></h2>
+    </div>
+
+    <div class="calendar-nav">
+      <a href="{{ url_for('event_calendar',year=prev_year,month=prev_month) }}">←</a>
+      <a href="{{ url_for('event_calendar') }}">Today</a>
+      <a href="{{ url_for('event_calendar',year=next_year,month=next_month) }}">→</a>
+    </div>
+  </div>
+
+  <div class="calendar-grid">
+    {% for day in ['MON','TUE','WED','THU','FRI','SAT','SUN'] %}
+      <div class="calendar-weekday">{{ day }}</div>
+    {% endfor %}
+
+    {% for week in weeks %}
+      {% for day in week %}
+        {% if day %}
+          {% set daystr = '%04d-%02d-%02d'|format(year,month,day) %}
+
+          <div class="calendar-day {{ 'is-today' if daystr==today else '' }} {{ 'has-events' if by_date.get(daystr) else '' }}">
+            <span class="day-number">{{ day }}</span>
+
+            {% for ev in by_date.get(daystr,[]) %}
+              <a class="calendar-event"
+                 title="{{ ev.title }}: {{ ev.start_date }} to {{ ev.end_date }}"
+                 href="{{ url_for('event_detail',event_id=ev.id) }}">
+                <span>{{ ev.image_emoji }}</span>
+                <b>{{ ev.title }}</b>
+                <small>
+                  {% if ev.start_date == ev.end_date %}
+                    {{ ev.start_time }} – {{ ev.end_time }}
+                  {% elif daystr == ev.start_date %}
+                    Starts · {{ ev.start_time }}
+                  {% elif daystr == ev.end_date %}
+                    Ends · {{ ev.end_time }}
+                  {% else %}
+                    All day · Continues
+                  {% endif %}
+                </small>
+              </a>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="calendar-day empty-day"></div>
+        {% endif %}
+      {% endfor %}
+    {% endfor %}
+  </div>
+
+  <div class="calendar-legend">
+    <span><i></i> Published events</span>
+    <span>Multi-day events appear on every date they span</span>
+    <span>Click an event to view details</span>
+  </div>
+</section>
+{% endblock %}
