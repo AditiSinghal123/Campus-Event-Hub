@@ -484,6 +484,8 @@ def export_registrations():
     response.headers["Content-Type"] = "text/csv; charset=utf-8"
     return response
 
+# Initialize database when the app starts, including under Gunicorn.
+init_db()
+
 if __name__ == "__main__":
-    init_db()
     app.run(debug=True)
