@@ -3,13 +3,30 @@ from datetime import datetime, date, timedelta
 from functools import wraps
 from flask import Flask, render_template, request, redirect, url_for, session, flash, g
 from werkzeug.security import generate_password_hash, check_password_hash
+import cloudinary
+import cloudinary.uploader
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 DB_PATH = os.path.join(BASE_DIR, "campus_events.db")
+
 app = Flask(__name__)
-app.secret_key = os.environ.get("SECRET_KEY", "change-this-secret-key-before-deployment")
+app.secret_key = os.environ.get(
+    "SECRET_KEY",
+    "change-this-secret-key-before-deployment"
+)
+
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+
+# Event poster upload configuration
+app.config["MAX_CONTENT_LENGTH"] = 5 * 1024 * 1024
+
+cloudinary.config(
+    cloud_name=os.environ.get("CLOUDINARY_CLOUD_NAME"),
+    api_key=os.environ.get("CLOUDINARY_API_KEY"),
+    api_secret=os.environ.get("CLOUDINARY_API_SECRET"),
+    secure=True
+)
 
 def get_db():
     if "db" not in g:
@@ -64,7 +81,7 @@ def init_db():
     );
     """)
 
-    # Add new date/time columns without deleting existing data
+       # Add new date/time columns without deleting existing data
     columns = {
         row[1]
         for row in db.execute("PRAGMA table_info(events)").fetchall()
@@ -80,6 +97,15 @@ def init_db():
             db.execute(
                 f"ALTER TABLE events ADD COLUMN {column} TEXT"
             )
+
+    # Add poster URL support without deleting existing events
+    columns = {
+        row[1]
+        for row in db.execute("PRAGMA table_info(events)").fetchall()
+    }
+
+    if "poster_url" not in columns:
+        db.execute("ALTER TABLE events ADD COLUMN poster_url TEXT")
 
     # Preserve existing events using their original dates and times
     db.execute("""
@@ -340,6 +366,7 @@ def admin_dashboard():
 
 @app.route("/admin/events", methods=["GET", "POST"])
 @admin_required
+
 def admin_events():
     db = get_db()
 
@@ -356,16 +383,19 @@ def admin_events():
 
         try:
             capacity = max(1, int(request.form.get("capacity", "100")))
-        except ValueError:
+        except (ValueError, TypeError):
             capacity = 100
 
         emoji = request.form.get("image_emoji", "🎉").strip()[:8] or "🎉"
+        poster = request.files.get("poster")
+        poster_url = None
 
         if not all([
             title, category, description, venue,
             start_date, end_date, start_time, end_time
         ]):
             flash("Please fill in all required event details.", "danger")
+
         else:
             try:
                 start_day = date.fromisoformat(start_date)
@@ -375,32 +405,74 @@ def admin_events():
                 datetime.strptime(end_time, "%H:%M")
 
                 if end_day < start_day:
-                    raise ValueError("End date must not precede start date.")
+                    raise ValueError(
+                        "End date must not precede start date."
+                    )
 
                 if end_day == start_day and end_time < start_time:
-                    raise ValueError("End time must not precede start time.")
+                    raise ValueError(
+                        "End time must not precede start time."
+                    )
 
             except ValueError:
                 flash(
-                    "Enter valid dates and times. The end must not be before the start.",
+                    "Enter valid dates and times. "
+                    "The end must not be before the start.",
                     "danger"
                 )
+
             else:
+                # Upload a poster only when a file is selected.
+                if poster and poster.filename:
+                    allowed_extensions = {"jpg", "jpeg", "png", "webp"}
+                    filename = poster.filename
+                    extension = (
+                        filename.rsplit(".", 1)[-1].lower()
+                        if "." in filename else ""
+                    )
+
+                    if extension not in allowed_extensions:
+                        flash(
+                            "Please upload a JPG, JPEG, PNG, or WebP poster.",
+                            "danger"
+                        )
+                        return redirect(url_for("admin_events"))
+
+                    try:
+                        result = cloudinary.uploader.upload(
+                            poster,
+                            folder="campus_event_hub/posters",
+                            resource_type="image",
+                            allowed_formats=["jpg", "jpeg", "png", "webp"]
+                        )
+                        poster_url = result["secure_url"]
+
+                    except Exception:
+                        app.logger.exception("Cloudinary poster upload failed")
+                        flash(
+                            "Poster upload failed. Check your Cloudinary "
+                            "environment variables and try again.",
+                            "danger"
+                        )
+                        return redirect(url_for("admin_events"))
+
                 db.execute("""
                     INSERT INTO events (
                         title, category, description, venue,
                         event_date, event_time,
                         capacity, image_emoji,
                         event_start_date, event_end_date,
-                        event_start_time, event_end_time
+                        event_start_time, event_end_time,
+                        poster_url
                     )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, (
                     title, category, description, venue,
                     start_date, start_time,
                     capacity, emoji,
                     start_date, end_date,
-                    start_time, end_time
+                    start_time, end_time,
+                    poster_url
                 ))
 
                 db.commit()

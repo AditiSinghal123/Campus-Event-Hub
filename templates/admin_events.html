@@ -44,7 +44,7 @@
         <span class="panel-spark">✳</span>
       </div>
 
-      <form method="post" class="admin-event-form">
+      <form method="post" class="admin-event-form" enctype="multipart/form-data">
         <label>
           Event name
           <input name="title" required placeholder="e.g. Inter-college Innovation Fest">
@@ -110,10 +110,19 @@
           <textarea name="description" required rows="3" placeholder="What will students experience?"></textarea>
         </label>
 
+        <label>
+  Event poster (optional)
+  <input
+    type="file"
+    name="poster"
+    accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+  >
+  <small>JPG, PNG, or WebP. Maximum size: 5 MB.</small>
+</label>
         <div class="full-field">
           <button class="btn btn-lime" type="submit">Create event ↗</button>
         </div>
-      </form>
+    </form>
       
 
 <script>
