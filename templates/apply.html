@@ -1,2 +1,164 @@
-{% extends 'base.html' %}{% block title %}Apply · {{ event.title }}{% endblock %}
-{% block content %}<div class="breadcrumb"><a href="{{ url_for('event_detail',event_id=event.id) }}">← Back to event</a></div><section class="form-layout"><div class="form-aside"><div class="eyebrow">YOUR NEXT CHAPTER</div><div class="form-emoji">{{ event.image_emoji }}</div><h1>Count me <em>in.</em></h1><p>One small sign-up. One big campus memory. Fill in your details to reserve a spot.</p><div class="mini-event"><span>{{ event.category }}</span><strong>{{ event.title }}</strong><small>📅 {{ event.event_date }} · ◷ {{ event.event_time }}</small><small>⌖ {{ event.venue }}</small></div></div><form method="post" class="application-form"><div class="form-top"><span class="form-step">01 / STUDENT DETAILS</span><h2>Let's get you registered.</h2><p>All fields are required.</p></div><label>Full name<input name="student_name" required value="{{ form.get('student_name','') }}" placeholder="e.g. Aditi Singhal"></label><div class="form-row"><label>College email<input name="email" type="email" required value="{{ form.get('email','') }}" placeholder="you@college.edu"></label><label>Student ID / Roll no.<input name="student_id" required value="{{ form.get('student_id','') }}" placeholder="e.g. MCA26-014"></label></div><div class="form-row"><label>Department / Course<input name="department" required value="{{ form.get('department','') }}" placeholder="e.g. MCA"></label><label>Phone number<input name="phone" type="tel" required value="{{ form.get('phone','') }}" placeholder="10-digit number"></label></div><button class="btn btn-lime btn-full" type="submit">Submit application <span>↗</span></button><p class="fine-print">By submitting, you confirm that your details are accurate.</p></form></section>{% endblock %}
+
+{% extends 'base.html' %}
+
+{% block title %}Apply · {{ event.title }}{% endblock %}
+
+{% block content %}
+
+<div class="breadcrumb">
+    <a href="{{ url_for('event_detail', event_id=event.id) }}">
+        ← Back to event
+    </a>
+</div>
+
+<section class="form-layout">
+
+    <!-- LEFT SIDE: EVENT INFORMATION -->
+    <div class="form-aside">
+
+        <div class="eyebrow">YOUR NEXT CHAPTER</div>
+
+        <!-- Show poster if uploaded; otherwise show emoji -->
+        {% if event.poster_url %}
+            <div class="application-event-poster">
+                <img
+                    src="{{ event.poster_url }}"
+                    alt="Poster for {{ event.title }}"
+                    loading="lazy"
+                >
+            </div>
+        {% else %}
+            <div class="form-emoji">
+                {{ event.image_emoji }}
+            </div>
+        {% endif %}
+
+        <h1>Count me <em>in.</em></h1>
+
+        <p>
+            One small sign-up. One big campus memory.
+            Fill in your details to reserve a spot.
+        </p>
+
+        <div class="mini-event">
+
+            <span>{{ event.category }}</span>
+
+            <strong>{{ event.title }}</strong>
+
+            {% if event.poster_url %}
+                <div class="registration-poster">
+                    <img
+                        src="{{ event.poster_url }}"
+                        alt="{{ event.title }} event poster"
+                        loading="lazy"
+                    >
+                </div>
+            {% endif %}
+
+            <small>
+                📅
+                {% if event.event_start_date %}
+                    {{ event.event_start_date }}
+                {% else %}
+                    {{ event.event_date }}
+                {% endif %}
+                ·
+                ◷
+                {% if event.event_start_time %}
+                    {{ event.event_start_time }}
+                {% else %}
+                    {{ event.event_time }}
+                {% endif %}
+            </small>
+
+            <small>⌖ {{ event.venue }}</small>
+
+        </div>
+
+    </div>
+
+    <!-- RIGHT SIDE: STUDENT REGISTRATION FORM -->
+    <form method="post" class="application-form">
+
+        <div class="form-top">
+            <span class="form-step">01 / STUDENT DETAILS</span>
+
+            <h2>Let's get you registered.</h2>
+
+            <p>All fields are required.</p>
+        </div>
+
+        <label>
+            Full name
+            <input
+                name="student_name"
+                required
+                value="{{ form.get('student_name', '') }}"
+                placeholder="e.g. Aditi Singhal"
+            >
+        </label>
+
+        <div class="form-row">
+
+            <label>
+                College email
+                <input
+                    name="email"
+                    type="email"
+                    required
+                    value="{{ form.get('email', '') }}"
+                    placeholder="you@college.edu"
+                >
+            </label>
+
+            <label>
+                Student ID / Roll no.
+                <input
+                    name="student_id"
+                    required
+                    value="{{ form.get('student_id', '') }}"
+                    placeholder="e.g. MCA26-014"
+                >
+            </label>
+
+        </div>
+
+        <div class="form-row">
+
+            <label>
+                Department / Course
+                <input
+                    name="department"
+                    required
+                    value="{{ form.get('department', '') }}"
+                    placeholder="e.g. MCA"
+                >
+            </label>
+
+            <label>
+                Phone number
+                <input
+                    name="phone"
+                    type="tel"
+                    required
+                    value="{{ form.get('phone', '') }}"
+                    placeholder="10-digit number"
+                >
+            </label>
+
+        </div>
+
+        <button class="btn btn-lime btn-full" type="submit">
+            Submit application <span>↗</span>
+        </button>
+
+        <p class="fine-print">
+            By submitting, you confirm that your details are accurate.
+        </p>
+
+    </form>
+
+</section>
+
+{% endblock %}
